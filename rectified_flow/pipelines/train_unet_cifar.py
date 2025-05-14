@@ -20,6 +20,8 @@ from accelerate.utils import (
     ProjectConfiguration,
     set_seed,
 )
+from torch import from_numpy
+from scipy.optimize import linear_sum_assignment
 from diffusers.optimization import get_scheduler
 
 from torchvision import transforms
@@ -594,6 +596,9 @@ def main(args):
             with accelerator.accumulate(models_to_accumulate):
                 x_1, _ = batch
                 x_0 = rectified_flow.sample_source_distribution(x_1.shape[0])
+                cost = torch.cdist(x_1.flatten(1), x_0.flatten(1))
+                _, reorder_indices = linear_sum_assignment(cost.cpu())
+                x_0 = x_0[from_numpy(reorder_indices).to(cost.device)]
                 t = rectified_flow.sample_train_time(x_1.shape[0])
 
                 loss = rectified_flow.get_loss(
